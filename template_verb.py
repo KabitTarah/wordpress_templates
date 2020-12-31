@@ -38,7 +38,7 @@ url = api_url + api
 wp_req = requests.get(url, headers=header)
 wp_resp = json.loads(wp_req.text)
 
-#template = jinja2.Environment.from_string(wp_resp["content"])
+template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(wp_resp["content"])
 
 verb_search = requests.get("https://dict.leo.org/german-english/" + verb).text
 # First <tr...> with "data-dz-flex-label-1" = "haben"
@@ -96,5 +96,32 @@ for pronoun in leo_pronouns.keys():
     if match:
         # Luckily present tense comes first
         t_vars["conj_" + pronoun] = ''.join(list(match.groups()))
+title = f"{ t_vars['verb_de'] } \u2014 { t_vars['verb_en'] }"
 
 print(json.dumps(t_vars, indent=4))
+print()
+print(f"Title: { title }")
+print()
+answer = ""
+while answer.upper() not in ["Y", "N"]:
+    print("Ok? (Y/n)")
+    answer = sys.stdin.read(1)
+
+if answer.upper() == "N":
+    print("Ok, exiting.")
+    exit()
+
+# Now we can finally fill out the template!
+new_post = {}
+new_post["content"] = template.render(t_vars)
+new_post["title"] = title
+new_post["categories"] = "Verbs"
+
+api = "/sites/" + site + "/posts/new/" 
+url = api_url + api
+print(url)
+wp_req = requests.post(url, headers=header, data=new_post)
+print(wp_req)
+wp_resp = json.loads(wp_req.text)
+print(json.dumps(wp_resp, indent=4))
+
