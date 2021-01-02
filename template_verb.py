@@ -45,7 +45,7 @@ verb_search = requests.get("https://dict.leo.org/german-english/" + verb).text
 
 # Goals:
 # 1. Find 1st entry (table row <tr ...>) for the verb requested
-# --- <tr>...data-dz-flex-label-1="<verb>( \([0-9]+\))?"...</tr>
+# --- <tr data-dz-ui="dictentry"...>...data-dz-flex-label-1="<verb>( \([0-9]+\))?"...</tr>
 #
 # 2. Find table cell with conj table link
 #
@@ -53,9 +53,15 @@ verb_search = requests.get("https://dict.leo.org/german-english/" + verb).text
 #
 # 4. Find english translation
 
-### 1. Get table rows:
+# Special Cases:
+# gehen  - "normal" case (completed)
+# kommen - two table sets have labels "kommen (1)" and "kommen (2)" (completed)
+# tun    -- special case in conj table - no root (all is conj extension and is in pink. Change + to * for root part)
+
+### 1. Get all dictentry table rows:
 # need parens around the entire regex because we're using findall
-regex = re.compile(f'(<tr(((?!>).)*)>(((?!</tr>).)*)data-dz-flex-label-1="{ verb }( \([0-9]+\))?"(((?!</tr>).)*)</tr>)')
+#regex = re.compile(f'(<tr(((?!>).)*)>(((?!</tr>).)*)data-dz-flex-label-1="{ verb }( \([0-9]+\))?"(((?!</tr>).)*)</tr>)')
+regex = re.compile(f'(<tr(((?!>).)*)data-dz-ui="dictentry"(((?!>).)*)>(((?!</tr>).)*)</tr>)')
 # use findall to find all matches even though we're *probably* interested in the 1st one
 rows = regex.findall(verb_search)
 if len(rows) == 0:
@@ -87,6 +93,7 @@ if not conj_cell or not info_cell or not trans_cell:
 # this gets the link & verb table:
 link = re.search(r'<a href="(((?!").)*)"', conj_cell.group())
 table = requests.get("https://dict.leo.org" + link.groups()[0]).text
+print(link.groups()[0])
 
 # this gets the table key (to link to from our template)
 key = re.search(r'data-dz-flex-table-1="(((?!").)*)"', conj_cell.group())
@@ -116,7 +123,7 @@ leo_pronouns = {"ich": "<span> ich</span>",
 pronouns = {}
 
 for pronoun in leo_pronouns.keys():
-    regex = re.compile(f'{ leo_pronouns[pronoun] }<span> ([a-z]+)<span class="pink">([a-z]+)</span></span>')
+    regex = re.compile(f'{ leo_pronouns[pronoun] }<span> ([a-z]*)<span class="pink">([a-z]+)</span></span>')
     match = regex.search(table)
     if match:
         # Luckily present tense comes first
