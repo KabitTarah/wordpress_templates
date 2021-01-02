@@ -40,45 +40,70 @@ wp_resp = json.loads(wp_req.text)
 
 template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(wp_resp["content"])
 
+# Get HTML search page for verb requested
 verb_search = requests.get("https://dict.leo.org/german-english/" + verb).text
-# First <tr...> with "data-dz-flex-label-1" = "haben"
+
+# Goals:
+# 1. Find 1st entry (table row <tr ...>) for the verb requested
+# --- <tr>...data-dz-flex-label-1="<verb>( \([0-9]+\))?"...</tr>
 #
-# <tr data-dz-ui="dictentry"  data-dz-rel-uid="941200" data-dz-rel-aiid="PluTF3tcF47" class="is-clickable"><td>
-# ......
-# <td data-dz-attr="relink" lang="en"><samp><a href="/german-english/to">to</a> <a href="/german-english/have">have</a>  <small><i><span title="auxiliary">aux.</span></i></small>
-# <a href="/pages/flecttab/flectionTable.php?kvz=4dkrADn71HeCbYCs67UP8lumz53RnXNnd4k4UOp95DaWagA5HfVNsltHXGnW64LCt7_6hM2-RVXTa5ApnoR7RM6R_uxHbjSDgu88hb2-UmZSKoC5voANxPt&amp;lp=ende&amp;lang=en"
-#    data-dz-ui="dictentry:showFlecttab" data-dz-flex-table-1="4dkrADn71HeCbYCs67UP8lumz53RnXNnd4k4UOp95DaWagA5HfVNsltHXGnW64LCt7_6hM2-RVXTa5ApnoR7RM6R_uxHbjSDgu88hb2-UmZSKoC5voANxPt"
-#    data-dz-flex-label-1="have" title="Open verb table" aria-label="Open verb table"><small>| had, had |</small></a></samp></td><td class="">
-# <a href="/pages/flecttab/flectionTable.php?kvz=4dkrADn71HeCbYC86wUP8lumz53RnXJXdzk4UOs95DMyOsAoG5LNgyvnKX31aZKb5xiLFr7PROBkEYHPChS7kt1BX3XWvgKBERyd9S2do9LuPIW_XJE_lAqDH7xS64fVQX89IKvqIgHS_UYvboQ79KeG2Luhu_TBka6-tn4_g2HUOIcPHhNsB12CDxtwO7I0Vp--BlAA9ye&amp;lp=ende&amp;lang=en"
-#    data-dz-ui="dictentry:showFlecttab" data-dz-flex-table-1="4dkrADn71HeCbYC86wUP8lumz53RnXJXdzk4UOs95DMyOsAoG5LNgyvnKX31aZKb5xiLFr7PROBkEYHPChS7kt1BX3XWvgKBERyd9S2do9LuPIW_XJE_lAqDH7xS64fVQX89IKvqIgHS_UYvboQ79KeG2Luhu_TBka6-tn4_g2HUOIcPHhNsB12CDxtwO7I0Vp--BlAA9ye"
-#    data-dz-flex-label-1="haben" title="Open verb table" aria-label="Open verb table">
-# <i role="img " alt="F" class="icon noselect icon_split-view-left-right icon_size_18 darkgray "> </i></a></td>
-# ......
-# </tr>
+# 2. Find table cell with conj table link
+#
+# 3. Find table cell with info link
+#
+# 4. Find english translation
 
-regex = re.compile(f'<tr(((?!(</tr>|data-dz-flex-label-1="{ verb }")).)*)<a href="(((?!").)*)" +data-dz-ui="dictentry:showFlecttab" +data-dz-flex-table-1="(((?!").)*)" +data-dz-flex-label-1="{ verb }" +title="Open verb table" +aria-label="Open verb table">')
-match = regex.search(verb_search)
-# Groups that should be found:
-#   0: Bunch of stuff I need to look through for English translation and info link
-#   1: last character in that sequence
-#   2: None (the middle match that is NOT supposed to be found with the negative lookahead)
-#   3: URL for verb table
-#   4: last character in that sequence
-#   5: URL Key for verb table (used in template)
-#   6: last character in that sequence
-
-if not match:
+### 1. Get table rows:
+# need parens around the entire regex because we're using findall
+regex = re.compile(f'(<tr(((?!>).)*)>(((?!</tr>).)*)data-dz-flex-label-1="{ verb }( \([0-9]+\))?"(((?!</tr>).)*)</tr>)')
+# use findall to find all matches even though we're *probably* interested in the 1st one
+rows = regex.findall(verb_search)
+if len(rows) == 0:
     print("Verb not found on dict.leo.org!")
     exit()
 
-t_vars["verb_leo"] = match.groups()[5]
-table = verb_search = requests.get("https://dict.leo.org" + match.groups()[3]).text
 
-en_match = re.findall(r'/german-english/([a-zA-Z-]+)', match.groups()[0])
-t_vars["verb_en"] = ' '.join(en_match)
+### 2. Find table cell with conj table link
+###    and 3. Find table cell with info link
+###    and 4. Find table cell with translation info
+conj_cell = None
+info_cell = None
+trans_cell = None
+i = 0
+while not conj_cell and not info_cell and not trans_cell and i < len(rows):
+    # We want these to come from the same row
+    conj_cell = None
+    info_cell = None
+    trans_cell = None
+    # conjugation cell:
+    regex = re.compile(f'<td(((?!>).)*)>(((?!</td>).)*)data-dz-flex-label-1="{ verb }( \([0-9]+\))?"(((?!</td>).)*)"Open verb table"(((?!</td>).)*)</td>')
+    conj_cell = regex.search(rows[i][0])
+    info_cell = re.search(r'<td(((?!>).)*)>(((?!</td>).)*)data-dz-rel-aiid=(((?!</td>).)*)</td>', rows[i][0])
+    trans_cell = re.search(r'<td(((?!>).)*)>(((?!</td>).)*)<a href="/german-english/(((?!</td>).)*)</td>', rows[i][0])
+    i += 1
+if not conj_cell or not info_cell or not trans_cell:
+    print("Verb info not found on dict.leo.org!")
+    exit()
+# this gets the link & verb table:
+link = re.search(r'<a href="(((?!").)*)"', conj_cell.group())
+table = requests.get("https://dict.leo.org" + link.groups()[0]).text
 
-info_match = re.search(r'data-dz-rel-aiid="(((?!").)*)"', match.groups()[0])
-t_vars["info_leo"] = list(info_match.groups())[0]
+# this gets the table key (to link to from our template)
+key = re.search(r'data-dz-flex-table-1="(((?!").)*)"', conj_cell.group())
+t_vars["verb_leo"] = key.groups()[0]
+
+
+### 3. Find table cell with info link
+# <td><a aria-label="Additional information" href="/pages/addinfo/addInfo.php?aiid=Dev5odCDopP&amp;lp=ende&amp;lang=en"><i role="img " title="Additional information" alt="i" class="icon noselect icon_information-outline icon_size_18 darkgray "><dz-data data-dz-ui="dictentry:showInfobox" data-dz-rel-aiid="Dev5odCDopP" data-dz-sprite="false"/> </i></a></td>
+info_key = re.search(r'data-dz-rel-aiid="(((?!").)*)"', info_cell.group())
+t_vars["info_leo"] = info_key.groups()[0]
+
+### 4. Find translation info
+
+trans_match = re.findall(r'/german-english/([a-zA-z-]+)', trans_cell.group())
+t_vars["verb_en"] = ' '.join(trans_match)
+
+# Find verb conjugations (present tense only)
 
 # <span> ich</span><span> h<span class="pink">abe</span></span>
 
