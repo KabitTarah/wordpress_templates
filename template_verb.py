@@ -1,3 +1,4 @@
+import boto3
 import json
 import requests
 import jinja2
@@ -10,8 +11,24 @@ def sanitize_text(txt) -> str:
     return ''.join([c for c in txt if unicodedata.category(c)[0]!="C"])
 
 # Constants
-oauth_file = "/home/pi/.secrets/wp_oauth.json"
-site_file = "/home/pi/.secrets/wp_site.json"
+ssm = boto3.client('ssm', region_name="us-east-2")
+wp_path = "/keys/wp/"
+site_path = "/site/"
+
+# Get WP parameters
+wp_ssm = ssm.get_parameters_by_path(Path=wp_path, WithDecryption=True)['Parameters']
+wp = {}
+for parameter in wp_ssm:
+    name = parameter['Name'].split('/')[3]
+    wp[name] = parameter['Value']
+wp['client_id'] = int(wp['client_id'])
+
+# Get Site parameters
+site_ssm = ssm.get_parameters_by_path(Path=site_path, WithDecryption=True)['Parameters']
+site_info = {}
+for parameter in site_ssm:
+    name = parameter['Name'].split('/')[2]
+    site_info[name] = parameter['Value']
 
 # Arguments:
 #   $1 german verb
@@ -26,16 +43,14 @@ t_vars = {"verb_de": verb}
 print(f"German verb: { verb }")
 
 # Get OAUTH info from WP.com
-payload = json.loads(open(oauth_file).read())
-site_info = json.loads(open(site_file).read())
-site = site_info["site"]
+site = site_info["url"]
 template_id = site_info["template"]
 
 oauth_url = "https://public-api.wordpress.com/oauth2/token"
 api_url = "https://public-api.wordpress.com/rest/v1.1"
 
-payload["grant_type"] = "password"
-oauth_req = requests.post(oauth_url, data=payload)
+wp["grant_type"] = "password"
+oauth_req = requests.post(oauth_url, data=wp)
 oauth_resp = json.loads(oauth_req.text)
 auth_header = {"Authorization": "Bearer " + oauth_resp["access_token"]}
 
@@ -143,6 +158,7 @@ while not conj_cell and i < len(rows):
         # this gets the link & verb table:
         link = re.search(r'<a href="(((?!").)*)"', conj_cell.group())
         table = sanitize_text(requests.get("https://dict.leo.org" + link.groups()[0]).text)
+        print(f"https://dict.leo.org{ link.groups()[0] }")
         table = table.replace('<200b>','') # Remove zero width spaces if they exist
         # this gets the table key (to link to from our template)
         key = re.search(r'data-dz-flex-table-1="(((?!").)*)"', conj_cell.group())
@@ -151,7 +167,7 @@ while not conj_cell and i < len(rows):
         print()
         print('Conjugation:')
         for pronoun in leo_pronouns.keys():
-            regex = re.compile(f'{ leo_pronouns[pronoun] }<span> ([a-z]*)<span class="pink">([a-z]+)</span></span>')
+            regex = re.compile(f'{ leo_pronouns[pronoun] }<span> (\w*)<span class="pink">(\w+)</span></span>')
             match = regex.search(table)
             if match:
                 # Luckily present tense comes first
