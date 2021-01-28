@@ -62,6 +62,17 @@ wp_resp = json.loads(wp_req.text)
 # This sets up the template object within the jinja2 framework
 template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(wp_resp["content"])
 
+# !TODO! Need to search post titles for requested verb to verify it hasn't been used
+url = f"https://public-api.wordpress.com/rest/v1.2/sites/{ site }/posts/?search={ verb }"
+wp_req = requests.get(url, headers=auth_header)
+wp_resp = json.loads(wp_req.text)
+for post in wp_resp['posts']:
+    title = post['title'].split()
+    if title[0] == verb:
+        print(f"ERROR: Verb already used in '{ post['title'] }'")
+        print(f"  Trace URL: { post['URL'] }")
+        exit(1)
+
 # Get HTML search page for verb requested
 verb_search = sanitize_text(requests.get("https://dict.leo.org/german-english/" + verb).text)
 
