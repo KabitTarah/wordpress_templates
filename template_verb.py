@@ -67,8 +67,8 @@ url = f"https://public-api.wordpress.com/rest/v1.2/sites/{ site }/posts/?search=
 wp_req = requests.get(url, headers=auth_header)
 wp_resp = json.loads(wp_req.text)
 for post in wp_resp['posts']:
-    title = post['title'].split()
-    if title[0] == verb:
+    title = post['title'].split('\u2014')
+    if title[0].rstrip() == verb:
         print(f"ERROR: Verb already used in '{ post['title'] }'")
         print(f"  Trace URL: { post['URL'] }")
         exit(1)
