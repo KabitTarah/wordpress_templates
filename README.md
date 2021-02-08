@@ -28,4 +28,5 @@ Downloads the latest anki deck and the full collection into the `data/` director
 
 # Next steps
 
-Automatically generate an anki deck for these items. The deck should have card GUIDs that are stable, so regenerating the deck does not duplicate / destroy card history. Anki deck to be stored in this repo or at https://de.kabit.club
+* Automatically generate an anki deck for these items. The deck should have card GUIDs that are stable, so regenerating the deck does not duplicate / destroy card history. Anki deck to be stored in this repo or at https://de.kabit.club
+* Write classes for Leo dictionary parsing and the various API calls I make. At this point it's growing to a level where I need to make it at least a little modular. It would be nice to grab all conjugations from the dictionary, too. It would be even better to start caching that in my own database (flat files for now, probably - though a local sql database could also work ok)
