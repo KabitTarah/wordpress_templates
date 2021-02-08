@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
@@ -33,5 +34,20 @@ for f in filter(lambda f: f['title']==folder, file_list):
     folder_id = f['id']
 
 file_list = drive.ListFile({'q': f"'{ folder_id }' in parents and trashed=false"}).GetList()
-for f in file_list:
-    print(json.dumps(f, indent=4))
+week = 0
+latest = None
+for f in filter(lambda f: "Week" in f['title'] and ".apkg" in f['title'], file_list):
+    match = re.search(r"Week ([0-9]+)\.apkg$", f['title'])
+    if match:
+        if int(match.groups()[0]) > week:
+            week = int(match.groups()[0])
+            latest = f
+
+os.chdir("data")
+print(f"Downloading { latest['title'] } from Google Drive")
+latest.GetContentFile(latest['title'])
+for f in filter(lambda f: f['title'] == "German VotD.apkg", file_list):
+    print(f"Downloading { f['title'] } from Google Drive")
+    f.GetContentFile(f['title'])
+
+os.chdir("..")
