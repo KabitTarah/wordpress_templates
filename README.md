@@ -18,7 +18,13 @@ This code is all specific to my use case at https://de.kabit.club
 
 # template_verb.py
 
-Requires a german verb as its only argument. Looks up english translation and verb present tense conjugations on dict.leo.org and gets URL info to fill out the wordpress template specified (private or public post in a WP domain you control).
+Requires a german verb as its only argument. Looks up english translation and verb present tense conjugations on dict.leo.org and gets URL info to fill out the wordpress template specified (private or public post in a WP domain you control). Also verifies whether the verb already exists (may need updates for compound verbs with one part already included or vice versa)
+
+# gauth.py
+
+Initial work with google authentication. Changes to subdirectory `auth/` (excluded in .gitignore). This directory must contain a client_secrets.json file pointing to a Google Drive API Application. Credential tokens are also saved in this directory. Credentials use remote code verification to allow interactive authorization from an ec2 instance.
+
+Prints out JSON info for all files in the DeVOTD directory (this is where my anki decks are stored). 
 
 # Next steps
 
