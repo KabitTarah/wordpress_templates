@@ -28,11 +28,21 @@ TENSES = [
         "Partizip Präsens",
         "Partizip Perfekt"]
 
-class leoverb:
+class LeoVerb:
+    """
+    Class LeoVerb - Queries dict.leo.org for verb info. Caches information to a local database for speed and to minimize
+                    network traffic.
+    
+    Methods:
+        Leoverb(verb, interactive=True) - Constructor
+        template_vars(tense_header, tense) - outputs dictionary for template filling
+    """
+    
     verb = None
     english = None
     table_link = ""
     table_key = ""
+    info_leo = ""
     conjugations = None
     db_json = None
     db = None
@@ -54,17 +64,16 @@ class leoverb:
     def _close_db(self):
         self.db.close()
     def _check_db(self) -> bool:
-        print(f"Checking db contents: { list(self.db.keys()) }")
         if self.verb.encode('UTF-8') in self.db.keys():
             return True
         else:
             return False
     def _update_db(self):
-        print("Outputting to DB")
         db = {}
         db['conjugations'] = self.conjugations
         db['table_link'] = self.table_link
         db['table_key'] = self.table_key
+        db['info_leo'] = self.info_leo
         db['english'] = self.english
         self.db_json = json.dumps(db)
         self.db[self.verb] = self.db_json
@@ -73,8 +82,24 @@ class leoverb:
         self.conjugations = db['conjugations']
         self.table_link = db['table_link']
         self.table_key = db['table_key']
+        self.info_leo = db['info_leo']
         self.english = db['english']
-        print(f"Got from DB { self.verb } - { self.english }")
+
+    def template_vars(self, tense_header: str, tense: str) -> dict:
+        if tense_header not in TENSE_HEADERS:
+            raise Exception(f"Tense Header not found. Must be in { TENSE_HEADERS }.")
+        if tense not in TENSES:
+            raise Exception(f"Tense not found. Must be in { TENSES }.")
+        t_vars = {}
+        t_vars['verb_en'] = '; '.join(self.english)
+        t_vars['verb_de'] = self.verb
+        t_vars['verb_leo'] = self.table_key
+        t_vars['info_leo'] = self.info_leo
+        conj = self.conjugations[tense_header][tense]
+        for key in conj.keys():
+            tkey = "conj_" + key.split('/')[0]
+            t_vars[tkey] = conj[key]
+        return t_vars
 
     def _sanitize_text(self, txt) -> str:
         # Some web data contains zero width strings and possibly other control characters. This strips them out
@@ -162,6 +187,20 @@ class leoverb:
                 key = re.search(r'data-dz-flex-table-1="(((?!").)*)"', conj_cell.group())
                 self.table_key = key.groups()[0]
             i+=1
+        
+        # Get Info page
+        i = 0
+        info_cell = None
+        while not info_cell and i < len(rows):
+            info_cell = None
+            info_cell = re.search(r'<td(((?!>).)*)>(((?!</td>).)*)data-dz-rel-aiid=(((?!</td>).)*)</td>', rows[i][0])
+            i += 1
+        if not info_cell:
+            print("Information page not found on leo!")
+            exit()
+        info_key = re.search(r'data-dz-rel-aiid="(((?!").)*)"', info_cell.group())
+        self.info_leo = info_key.groups()[0]
+
     
     def get_table(self):
         header = {'User-Agent': "Mozilla/5.0 (iPad; CPU OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/87.0.4280.77 Mobile/15E148 Safari/604.1"}
@@ -221,4 +260,4 @@ if __name__ == "__main__":
     if len(sys.argv) <= 1:
         exit()
     verb_in = sys.argv[1]
-    verb = leoverb(verb_in)
+    verb = LeoVerb(verb_in)
