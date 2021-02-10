@@ -14,6 +14,8 @@
 #                         - Yearly packages should all have the same main folder (German VotD)
 #    - Anki decks uploaded to Google Drive for distribution 
 #
+# Distributed under MIT license (see license.txt), Copyright Tarah Z. Tamayo
+#
 
 from leo.leoverb import LeoVerb
 

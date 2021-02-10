@@ -1,4 +1,7 @@
-from leo import leoverb
+# Distributed under MIT license (see license.txt), Copyright Tarah Z. Tamayo
+#
+
+import leoverb
 import boto3
 import json
 import requests

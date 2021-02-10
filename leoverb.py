@@ -1,3 +1,6 @@
+# Distributed under MIT license (see license.txt), Copyright Tarah Z. Tamayo
+#
+
 import sys
 import requests
 import unicodedata

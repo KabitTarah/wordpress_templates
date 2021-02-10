@@ -1,7 +1,9 @@
 # 
-# anki_test.py - Tarah Z. Tamayo
+# anki_test.py
 #    -- Testing out retrieval and creation of collections / decks / cards using the anki library
 # 
+# Distributed under MIT license (see license.txt), Copyright Tarah Z. Tamayo
+#
 
 import os
 #from zipfile import ZipFile
