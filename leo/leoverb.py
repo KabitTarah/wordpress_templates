@@ -34,7 +34,7 @@ class LeoVerb:
                     network traffic.
     
     Methods:
-        Leoverb(verb, interactive=True) - Constructor
+        LeoVerb(verb, interactive=True) - Constructor
         template_vars(tense_header, tense) - outputs dictionary for template filling
     """
     
@@ -84,8 +84,26 @@ class LeoVerb:
         self.table_key = db['table_key']
         self.info_leo = db['info_leo']
         self.english = db['english']
+    
+    def _sanitize_text(self, txt) -> str:
+        # Some web data contains zero width strings and possibly other control characters. This strips them out
+        return ''.join([c for c in txt if unicodedata.category(c)[0]!="C"])
 
     def template_vars(self, tense_header: str, tense: str) -> dict:
+        """
+        template_vars(tense_header, tense) -> dict
+        Inputs:
+            tense_header - one of the values in leoverb.TENSE_HEADERS.
+            tense        - one of the values in leoverb.TENSES
+        Output:
+            dictionary containing no hierarchy with special values:
+                verb_de  - The requested German verb
+                verb_en  - English translations of this verb (semicolon separated)
+                verb_leo - The dict.leo.org dictionary key to enable links / lookups to full inflection tables
+                info_leo - The dict.leo.org informational key to enable links to information / forum posts
+                conj_... - Conjugations of the verb for the requested tense. These keys include the subject pronoun
+                           (in place of "..." here)
+        """
         if tense_header not in TENSE_HEADERS:
             raise Exception(f"Tense Header not found. Must be in { TENSE_HEADERS }.")
         if tense not in TENSES:
@@ -100,10 +118,6 @@ class LeoVerb:
             tkey = "conj_" + key.split('/')[0]
             t_vars[tkey] = conj[key]
         return t_vars
-
-    def _sanitize_text(self, txt) -> str:
-        # Some web data contains zero width strings and possibly other control characters. This strips them out
-        return ''.join([c for c in txt if unicodedata.category(c)[0]!="C"])
 
     def get_trans(self, interactive=True):
         # Get HTML search page for verb requested

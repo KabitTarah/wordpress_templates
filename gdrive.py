@@ -3,6 +3,7 @@ import json
 import re
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+import anki
 
 folder = "DeVOTD"
 
@@ -49,5 +50,10 @@ latest.GetContentFile(latest['title'])
 for f in filter(lambda f: f['title'] == "German VotD.apkg", file_list):
     print(f"Downloading { f['title'] } from Google Drive")
     f.GetContentFile(f['title'])
+
+cwd = os.getcwd()
+latest_path = cwd + latest['title']
+deck = anki.Collection(latest_path)
+print(deck)
 
 os.chdir("..")
