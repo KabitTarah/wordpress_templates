@@ -23,7 +23,7 @@ class Secrets:
         if type == "ssm":
             if "region" not in kwargs.keys():
                 raise Exception(f"AWS Region required for SSM stored secrets. Set `region='us-east-2'")
-            self.ssm = boto3.client('ssm', region_name=region)
+            self.ssm = boto3.client('ssm', region_name=kwargs['region'])
     
     def get_wp_key(self) -> dict:
         """
@@ -34,7 +34,7 @@ class Secrets:
             return self.get_wp_key_ssm()
     
     def get_wp_key_ssm(self) -> dict:
-        wp_ssm = site.ssm.get_parameters_by_path(Path=self.ssm_wp_key, WithDecryption=True)['Parameters']
+        wp_ssm = self.ssm.get_parameters_by_path(Path=self.ssm_wp_key, WithDecryption=True)['Parameters']
         wp = {}
         for parameter in wp_ssm:
             name = parameter['Name'].split('/')[3]

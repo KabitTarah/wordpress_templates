@@ -12,6 +12,7 @@ from secrets import Secrets
 import json
 import requests
 import jinja2
+import re
 
 class WPT:
     secrets = None
@@ -26,8 +27,8 @@ class WPT:
     oauth_url = "https://public-api.wordpress.com/oauth2/token"
     api_url = "https://public-api.wordpress.com/rest/v1.1"
     
-    def __init__(self, secret_store: str="ssm", **kwargs):        
-        self.secrets = Secrets(secret_store, **kwargs)
+    def __init__(self, secret_store: str="ssm", **kwargs):
+        self.secrets = Secrets(type=secret_store, **kwargs)
     
     def _get_secrets(self):
         self.wp_key = self.secrets.get_wp_key()
@@ -65,32 +66,37 @@ class WPT:
           - Sets the template variables. This can be used in place of get_template() for customized template
             changes.
         """
+        # Wordpress seems to add "Private: " to the beginning of post titles that have not been published
+        if "Private: " in title_template:
+            title_template = title_template.replace("Private: ", "")
         # This sets up the template objects within the jinja2 framework
-        self.wp_template_title = jinja2.Environment(loader=jinja2.BaseLoader).from_string(title_template))
+        self.wp_template_title = jinja2.Environment(loader=jinja2.BaseLoader).from_string(title_template)
         self.wp_template_body = jinja2.Environment(loader=jinja2.BaseLoader).from_string(body_template)
     
-    def find_title_keyword(self, title_keyword: str) -> bool:
+    def find_title_keyword(self, title_keyword: str) -> object:
         """
-        find_title_keyword(title_keyword) -> bool
+        find_title_keyword(title_keyword) -> wordpress response object
           - Determines whether the keyword has already been used in a post title. This is to avoid duplicates
             assuming a unique keyword used. (This project has a unique verb string)
             (note that this may not be entirely unique in the case of compound or prefixed verbs)
         """
+        if self.wp_site is None:
+            self._get_site()
         site = self.wp_site['url']
         url = f"https://public-api.wordpress.com/rest/v1.2/sites/{ site }/posts/?search={ title_keyword }"
         wp_req = requests.get(url, headers=self.wp_oauth_header)
         wp_resp = json.loads(wp_req.text)
         for post in wp_resp['posts']:
             title = post['title'].split('\u2014')  # This splits on em-dash; need a way to make this more generic
-            if title[0].rstrip() == verb:
-                return True
-                # raise Exception(f"ERROR: Duplicate word used in '{ post['title'] }'\n  Trace URL: { post['URL'] }")
-        return False
+            if title[0].rstrip() == title_keyword:
+                return post
+        return None
     
     def set_template_vars(self, template_vars: dict):
         """
         set_template_vars(template_vars) - Assigns the template vars dictionary to the wordpress templating engine
         """
+        self.template_vars = template_vars
 
     def get_title(self) -> str:
         """
@@ -98,6 +104,8 @@ class WPT:
         """
         if self.template_vars is None:
             raise Exception(f"Use set_template_vars first before filling in template.")
+        if self.wp_template_title is None:
+            self.get_template()
         return self.wp_template_title.render(self.template_vars)
     
     def get_body(self) -> str:
@@ -120,6 +128,6 @@ class WPT:
         
         site = self.wp_site['url']
         api = "/sites/" + site + "/posts/new/"
-        url = api_url + api
-        wp_req = requests.post(url, headers=auth_header, data=new_post)
+        url = self.api_url + api
+        wp_req = requests.post(url, headers=self.wp_oauth_header, data=new_post)
         self.post_response = json.loads(wp_req.text)
