@@ -4,25 +4,31 @@
 # 
 
 import os
-from zipfile import ZipFile
+#from zipfile import ZipFile
 import anki
 from anki.exporting import AnkiPackageExporter
+from anki.importing.apkg import AnkiPackageImporter
 import json
 
 cwd = os.getcwd()
-testfile = cwd + "/data/test.apkg"
+testfile = cwd + "/data/test_in.apkg"
 tmpdir = cwd + "/data/tmp/"
-with ZipFile(testfile, "r") as z:
-    z.extractall(tmpdir)
+#with ZipFile(testfile, "r") as z:
+#    z.extractall(tmpdir)
 
 print("\nCOLLECTION")
 fname = tmpdir + "collection.anki2"
 colln = anki.Collection(fname)
 print(colln)
 
+print("\nIMPORT PACKAGE")
+importer = AnkiPackageImporter(colln, testfile)
+importer.run()
+
 print("\nDECKS")
 decks = colln.decks.all_names_and_ids()
-deck = colln.decks.get(decks[1].id)
+print(decks)
+deck = colln.decks.get(decks[2].id)
 print(deck)
 
 print("\nCARDS")
@@ -37,6 +43,9 @@ print("\nMODELS")
 for model in colln.models.all():
     print(model)
     print()
+
+print("\nMEDIA")
+print(colln.media.dir())
 
 print("\nCREATING A COLLECTION...")
 new_testfile = cwd + "/data/test/collection.anki2"
@@ -90,7 +99,7 @@ note.fields = ['test', '[sound:test.mp3]']
 new_colln.add_note(note, deck)
 
 print("\nPACKAGING UP COLLECTION")
-out_path = cwd + "/data/test.apkg"
+out_path = cwd + "/data/test_out.apkg"
 exporter = AnkiPackageExporter(new_colln)
 exporter.exportInto(out_path)
 
