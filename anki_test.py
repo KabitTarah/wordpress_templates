@@ -6,6 +6,7 @@
 import os
 from zipfile import ZipFile
 import anki
+from anki.exporting import AnkiPackageExporter
 import json
 
 cwd = os.getcwd()
@@ -80,3 +81,17 @@ all_notes = new_colln.find_notes("")
 for n in all_notes:
     print(new_colln.getNote(n))
     print()
+    
+print("\nADDING MEDIA... (including a new note)")
+media_fname = cwd + "/data/test.mp3"
+media = new_colln.media.add_file(media_fname)
+note = anki.notes.Note(new_colln, model)
+note.fields = ['test', '[sound:test.mp3]']
+new_colln.add_note(note, deck)
+
+print("\nPACKAGING UP COLLECTION")
+out_path = cwd + "/data/test.apkg"
+exporter = AnkiPackageExporter(new_colln)
+exporter.exportInto(out_path)
+
+new_colln.close()
