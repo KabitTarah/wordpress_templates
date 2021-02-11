@@ -50,6 +50,11 @@ latest.GetContentFile(latest['title'])
 for f in filter(lambda f: f['title'] == "German VotD.apkg", file_list):
     print(f"Downloading { f['title'] } from Google Drive")
     f.GetContentFile(f['title'])
+    with open(f"{f['title']}.meta", "w") as metafile:
+        json.dump(f, metafile)
+    with open(f"{f['title']}.meta", "r") as metafile:
+        meta = json.load(metafile)
+        print(meta)
 
 cwd = os.getcwd()
 latest_path = cwd + latest['title']
