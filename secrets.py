@@ -15,6 +15,7 @@ class Secrets:
     ssm = None
     ssm_wp_key = "/keys/wp/"
     ssm_wp_site = "/site/"
+    ssm_forvo_key = "/keys/forvo/"
    
     def __init__(self, type: str = "ssm", **kwargs):
         if type not in TYPES:
@@ -57,4 +58,19 @@ class Secrets:
             name = parameter['Name'].split('/')[2]
             site_info[name] = parameter['Value']
         return site_info
-        
+    
+    def get_forvo_key(self) -> dict:
+        """
+        get_forvo_key() - returns dictionary of Forvo API credentials from secrets storage.
+                        - defers to secrets storage routines based on storage type
+        """
+        if self.type == "ssm":
+            return self.get_forvo_key_ssm()
+    
+    def get_forvo_key_ssm(self) -> dict:
+        forvo_ssm = self.ssm.get_parameters_by_path(Path=self.ssm_forvo_key, WithDecryption=True)['Parameters']
+        forvo_key = {}
+        for parameter in forvo_ssm:
+            name = parameter['Name'].split('/')[3]
+            forvo_key[name] = parameter['Value']
+        return forvo_key 

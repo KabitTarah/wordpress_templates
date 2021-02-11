@@ -83,7 +83,7 @@ class WPT:
         if self.wp_site is None:
             self._get_site()
         site = self.wp_site['url']
-        url = f"https://public-api.wordpress.com/rest/v1.2/sites/{ site }/posts/?search={ title_keyword }"
+        url = f"{ self.api_url }/sites/{ site }/posts/?search={ title_keyword }"
         wp_req = requests.get(url, headers=self.wp_oauth_header)
         wp_resp = json.loads(wp_req.text)
         for post in wp_resp['posts']:
@@ -131,3 +131,36 @@ class WPT:
         url = self.api_url + api
         wp_req = requests.post(url, headers=self.wp_oauth_header, data=new_post)
         self.post_response = json.loads(wp_req.text)
+
+    def get_titles(self, category: str) -> list:
+        """
+        get_titles() - required by ankidevotd library. Gets a list of post titles filtered by 
+                       category or tag.
+        """
+        if self.wp_key is None:
+            self._get_secrets()
+        if self.wp_site is None:
+            self._get_site()
+        if self.wp_oauth_header is None:
+            self._wp_authorize()
+        site = self.wp_site['url']
+        url = f"{ self.api_url }/sites/{ site }/posts/?number=100&fields=title&order=ASC&order_by=date&status=publish&category={ category }&page="
+        page = 0
+        num = 0
+        found = 1
+        while num < found:
+            page += 1
+            wp_req = requests.get(url + str(page), headers=self.wp_oauth_header)
+            wp_data = json.loads(wp_req.text)
+            found = wp_data['found']
+            num += 100
+            titles = []
+            for post in wp_data['posts']:
+                titles.append(post['title'])
+        return titles
+        
+if __name__ == "__main__":
+    wpt = WPT("ssm", region="us-east-2")
+    titles = wpt.get_titles(category="Verbs")
+    print(titles)
+    print(len(titles))
