@@ -15,7 +15,7 @@ class Secrets:
     ssm = None
     ssm_wp_key = "/keys/wp/"
     ssm_wp_site = "/site/"
-    ssm_forvo_key = "/keys/forvo/"
+    ssm_forvo_key = "/keys/forvo"
    
     def __init__(self, type: str = "ssm", **kwargs):
         if type not in TYPES:
@@ -67,10 +67,7 @@ class Secrets:
         if self.type == "ssm":
             return self.get_forvo_key_ssm()
     
-    def get_forvo_key_ssm(self) -> dict:
-        forvo_ssm = self.ssm.get_parameters_by_path(Path=self.ssm_forvo_key, WithDecryption=True)['Parameters']
-        forvo_key = {}
-        for parameter in forvo_ssm:
-            name = parameter['Name'].split('/')[3]
-            forvo_key[name] = parameter['Value']
+    def get_forvo_key_ssm(self) -> str:
+        forvo_ssm = self.ssm.get_parameter(Name=self.ssm_forvo_key, WithDecryption=True)['Parameter']
+        forvo_key = forvo_ssm['Value']
         return forvo_key 

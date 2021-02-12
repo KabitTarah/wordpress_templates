@@ -3,9 +3,9 @@
 #     X Get full list of verbs from wordpress -- WPT library will handle this
 #     X Figure out which week we're in (based on number of verbs posts / verb list)
 #     * Get the latest DeVotD yearly and weekly decks
-#     * Figure out the latest verb available in DeVotD anki deck
-#     * Update decks for all verbs since latest available
+#     X Figure out the latest verb available in DeVotD anki deck
 #     * Update media for new cards from Forvo library (to be created)
+#     * Update decks for all verbs since latest available
 #     * Update decks on Google Drive
 # 
 # Distributed under MIT license (see license.txt), Copyright Tarah Z. Tamayo
@@ -246,5 +246,3 @@ if __name__ == "__main__":
     advd = AnkiDeVotD(wpt)
     advd.run()
     print(advd.verb_list)
-    
-    
