@@ -8,7 +8,7 @@ import re
 import json
 import dbm
 
-DATABASE = "data/verbs.dbm"
+DATABASE = "/home/ec2-user/git/wordpress_templates/data/verb.dbm"
 
 TENSE_HEADERS = [
         "Indikativ",

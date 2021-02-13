@@ -40,10 +40,12 @@ class Forvo:
         url = f"{ self.api_url }/{ self.api_key }/{ api }"
         
         req = requests.get(url)
-        data = json.loads(req.text)['items'][0]
+        data = json.loads(req.text)['items']            
         print(json.dumps(data, indent=4))
+        if len(data) == 0:
+            return None
         # we care about data['pathmp3']
-        mp3 = requests.get(data['pathmp3'])
+        mp3 = requests.get(data[0]['pathmp3'])
         with open(fname, 'wb') as fp:
             fp.write(mp3.content)
         return fname
@@ -51,9 +53,8 @@ class Forvo:
         
 if __name__ == "__main__":
     forvo = Forvo(secret_store="ssm", region="us-east-2")
-    forvo.get_pronunciation("dürfen")
-    
-    
+    print(forvo.get_pronunciation("dürfen"))
+    print(forvo.get_pronunciation("laksdjflakaskdjgbhn"))
     
     
     
