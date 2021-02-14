@@ -83,17 +83,27 @@ class LeoVerb:
     db_json = None
     db = None
     
-    def __init__(self, verb, interactive=True):
+    def __init__(self, verb, interactive=True, delete=False):
         self.verb = verb
         self.conjugations = {}
         self._open_db()
         if self._check_db():
-            self._get_db()
+            if delete:
+                self._del_db()
+            else:
+                self._get_db()
+                self._update_db()
         else:
             self.get_trans()
             self.get_table("de")
             self.get_table("en")
-        self._update_db()
+            self._update_db()
+        self._close_db()
+    
+    def delete(self):
+        self._open_db()
+        if self._check_db():
+            self._del_db()
         self._close_db()
         
     def _open_db(self):
@@ -160,7 +170,9 @@ class LeoVerb:
             self.en_conjugations = db['en_conjugations']
         else:
             self.get_table("en")
-    
+    def _del_db(self):
+        self.db[self.verb] = "{}"
+
     def _sanitize_text(self, txt) -> str:
         """
         _sanitize_text(txt) - Returns the string with all unicode control characters removed (e.g. zero width spaces)
@@ -280,7 +292,7 @@ class LeoVerb:
         get_german_conj_link() - Retrieves the first link to the German conjugation table
         """
         # Get conjugation page
-        regex = re.compile(f'<td(((?!>).)*)>(((?!</td>).)*)data-dz-flex-label-1="{ self.verb }( \([0-9]+\))?"(((?!</td>).)*)"Open verb table"(((?!</td>).)*)</td>')
+        regex = re.compile(f'<td(((?!>).)*)>(((?!</td>).)*)data-dz-flex-label-1="{ self.verb }( \(1\))?"(((?!</td>).)*)"Open verb table"(((?!</td>).)*)</td>')
         i = 0
         conj_cell = None
         while not conj_cell and i < len(self.html_verb_rows):
@@ -299,23 +311,25 @@ class LeoVerb:
         """
         get_english_conj_link() - Retrieves the first link to the English conjugation table
         """
-        # First English verb w/o "to"
-        en_verb = self.english[0].split()[1].lower()
-        
         # Get conjugation page
-        regex = re.compile(f'<td(((?!>).)*)>(((?!</td>).)*)data-dz-flex-label-1="{ en_verb }( \([1-9]+\))?"(((?!</td>).)*)"Open verb table"(((?!</td>).)*)</td>')
-        i = 0
+        j = 0
         conj_cell = None
-        while not conj_cell and i < len(self.html_verb_rows):
-            # Looking for conjugation tables (EN)
-            if conj_cell is None:
-                conj_cell = regex.search(self.html_verb_rows[i][0])
-            if conj_cell:
-                link = re.search(r'<a href="(((?!").)*)"', conj_cell.group())
-                self.en_table_link = "https://dict.leo.org" + link.groups()[0]
-                key= re.search(r'data-dz-flex-table-1="(((?!").)*)"', conj_cell.group())
-                self.en_table_key = key.groups()[0]
-            i+=1
+        while j < len(self.english):
+            i = 0
+            # English verb w/o "to"
+            en_verb = self.english[j].split()[1].lower()
+            regex = re.compile(f'<td(((?!>).)*)>(((?!</td>).)*)data-dz-flex-label-1="{ en_verb }( \(1\))?"(((?!</td>).)*)"Open verb table"(((?!</td>).)*)</td>')
+            while not conj_cell and i < len(self.html_verb_rows):
+                # Looking for conjugation tables (EN)
+                if conj_cell is None:
+                    conj_cell = regex.search(self.html_verb_rows[i][0])
+                if conj_cell:
+                    link = re.search(r'<a href="(((?!").)*)"', conj_cell.group())
+                    self.en_table_link = "https://dict.leo.org" + link.groups()[0]
+                    key= re.search(r'data-dz-flex-table-1="(((?!").)*)"', conj_cell.group())
+                    self.en_table_key = key.groups()[0]
+                i+=1
+            j+=1
 
     def get_info_link(self):
         # Get Info page
@@ -397,40 +411,49 @@ class LeoVerb:
             if row in tense_headers:
                 if header:
                     if lang == "en":
-                        self.en_conjugations[header] = head_dict
+                        if header not in self.en_conjugations:
+                            self.en_conjugations[header] = head_dict
                     else:
-                        self.conjugations[header] = head_dict
+                        if header not in self.conjugations:
+                            self.conjugations[header] = head_dict
                 header = row
                 head_dict = {}
                 if tense:
-                    head_dict[tense] = tense_dict
+                    if tense not in head_dict.keys():
+                        head_dict[tense] = tense_dict
                 tense = ""
                 tense_dict = {}
             elif row in tenses:
                 if tense:
-                    head_dict[tense] = tense_dict
+                    if tense not in head_dict.keys():
+                        head_dict[tense] = tense_dict
                 tense = row
                 tense_dict = {}
             else:
                 row_parts = row.split()
-                print(row_parts)
                 if len(row_parts) > 1:
-                    tense_dict[row_parts[0]] = ' '.join(row_parts[1:])
+                    if row_parts[0] not in tense_dict.keys():
+                        tense_dict[row_parts[0]] = ' '.join(row_parts[1:])
                 else:
                     tense_dict = row_parts[0]
         head_dict[tense] = tense_dict
         if lang == "en":
-            self.en_conjugations[header] = head_dict
+            if header not in self.en_conjugations.keys():
+                self.en_conjugations[header] = head_dict
         else:
-            self.conjugations[header] = head_dict
+            if header not in self.conjugations.keys():
+                self.conjugations[header] = head_dict
     
-    
-
 if __name__ == "__main__":
     if len(sys.argv) <= 1:
         exit()
     verb_in = sys.argv[1]
+    if verb_in == "del":
+        verb_in = sys.argv[2]
+        verb = LeoVerb(verb_in, delete=True)
+        exit()
     verb = LeoVerb(verb_in)
+    print(verb.html_verb_rows)
     print("DEUTSCH")
     print(json.dumps(verb.conjugations, indent = 4))
     print("\n\nENGLISH")
