@@ -407,6 +407,8 @@ class LeoVerb:
         tense = ""
         head_dict = {}
         tense_dict = {}
+        # Sometimes there is a 2nd mood for a verb - we ignore this for now and only grab the
+        # first mood found. This is performed in the "if header not in" and "if tense not in" lines
         for row in filter(lambda r: "#Search" not in r, conj_tab):
             if row in tense_headers:
                 if header:
