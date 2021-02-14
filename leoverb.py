@@ -90,16 +90,10 @@ class LeoVerb:
         if self._check_db():
             self._get_db()
         else:
-            self.get_trans(interactive)
+            self.get_trans()
             self.get_table("de")
             self.get_table("en")
-            self._update_db()
-        # New fields - This should be more modular. Check all fields. Get the ones that are missing
-        # This will allow us to add new fields more easily in the future
-        if self.en_table_key is None or self.en_conjugations is None:
-            self.get_trans(interactive=False)
-            self.get_table("en")
-            self._update_db()
+        self._update_db()
         self._close_db()
         
     def _open_db(self):
@@ -113,6 +107,8 @@ class LeoVerb:
             return False
     def _update_db(self):
         db = {}
+        db['html'] = self.html
+        db['html_verb_rows'] = self.html_verb_rows
         db['conjugations'] = self.conjugations
         db['table_link'] = self.table_link
         db['table_key'] = self.table_key
@@ -125,17 +121,45 @@ class LeoVerb:
         self.db[self.verb] = self.db_json
     def _get_db(self):
         db = json.loads(self.db.get(self.verb).decode('UTF-8'))
-        self.conjugations = db['conjugations']
-        self.table_link = db['table_link']
-        self.table_key = db['table_key']
-        self.info_leo = db['info_leo']
-        self.english = db['english']
-        if 'en_table_link' in db.keys():
+        if "html" in db.keys() and "html_verb_rows" in db.keys():
+            self.html = db['html']
+            self.html_verb_rows = db['html_verb_rows']
+        else:
+            self.get_verb_search()
+            self.get_verb_section()
+            self.get_verb_rows()
+
+        if "english" in db.keys():
+            self.english = db['english']
+        else:
+            self.get_english_trans()
+
+        if "table_link" in db.keys() and "table_key" in db.keys():
+            self.table_link = db['table_link']
+            self.table_key = db['table_key']
+        else:
+            self.get_german_conj_link()
+
+        if "en_table_link" in db.keys() and "en_table_key" in db.keys():
             self.en_table_link = db['en_table_link']
-        if 'en_table_key' in db.keys():
             self.en_table_key = db['en_table_key']
-        if 'en_conjugations' in db.keys():
+        else:
+            self.get_english_conj_link()
+
+        if "info_leo" in db.keys():
+            self.info_leo = db['info_leo']
+        else:
+            self.get_info_link()
+
+        if "conjugations" in db.keys():
+            self.conjugations = db['conjugations']
+        else:
+            self.get_table("de")
+
+        if "en_conjugations" in db.keys():
             self.en_conjugations = db['en_conjugations']
+        else:
+            self.get_table("en")
     
     def _sanitize_text(self, txt) -> str:
         """
@@ -407,4 +431,7 @@ if __name__ == "__main__":
         exit()
     verb_in = sys.argv[1]
     verb = LeoVerb(verb_in)
+    print("DEUTSCH")
+    print(json.dumps(verb.conjugations, indent = 4))
+    print("\n\nENGLISH")
     print(json.dumps(verb.en_conjugations, indent = 4))
