@@ -17,7 +17,7 @@ class Forvo:
     """
     """
     
-    data_dir = "data/forvo/"
+    data_dir = "/home/ec2-user/git/wordpress_templates/data/forvo"
     secrets = None
     api_key = None
     api_url = "https://apifree.forvo.com/key"
@@ -32,7 +32,7 @@ class Forvo:
         if self.api_key is None:
             self._get_secrets()
         
-        fname = f"{ os.getcwd() }/{ self.data_dir }/{ word }.mp3"
+        fname = f"{ self.data_dir }/{ word }.mp3"
         if os.path.exists(fname):
             return fname
         
@@ -41,7 +41,6 @@ class Forvo:
         
         req = requests.get(url)
         data = json.loads(req.text)['items']            
-        print(json.dumps(data, indent=4))
         if len(data) == 0:
             return None
         # we care about data['pathmp3']

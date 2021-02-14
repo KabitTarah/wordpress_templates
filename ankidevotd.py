@@ -22,6 +22,35 @@ from anki.importing.apkg import AnkiPackageImporter
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
+# German --> English **field** translations
+FIELD_TRANSLATION_TABLE = {
+    "Indikativ": "Indicative",
+    "Präsens": "Simple present",
+    "ich": "I",
+    "du": "you",
+    "er/sie/es": "he/she/it",
+    "wir": "we",
+    "ihr": "you",
+    "sie": "they"}
+
+# German --> English **NOTE** translations
+PRONOUN_TRANSLATION_TABLE = {
+    "ich": "I",
+    "du": "you (informal)",
+    "er/sie/es": "he/she/they/it",
+    "wir": "we",
+    "ihr": "you (plural, informal)",
+    "sie": "you (formal) / they"}
+
+# German --> German **NOTE** translations
+PRONOUN_NOTE_TABLE = {
+    "ich": "ich",
+    "du": "du",
+    "er/sie/es": "er / sie / es",
+    "wir": "wir",
+    "ihr": "ihr", 
+    "sie": "Sie / sie"}
+
 class AnkiDeVotD:
     """
     AnkiDeVotD - Class to build Deutsch Verb of the Week decks and cards in Anki and deploy anki card
@@ -37,15 +66,18 @@ class AnkiDeVotD:
     
     # These are all tenses currently included in deck building, plus the infinitive
     tenses = {
-        "Present": ["Indikativ", "Präsens"]
+        "Present": [["Indikativ", "Präsens"], ["Indicative", "Simple present"]]
     }
     
     cwd = None
+    data_dir = "data"
+    full_output_file = "German VotD.apkg"
     wpt = None
     
     verb_list = None
     weeks = None
     gdrive = None
+    forvo = None
     current_pkg = None
     
     def __init__(self, wpt: object):
@@ -58,6 +90,7 @@ class AnkiDeVotD:
         self._get_verb_posts()
         self._build_verb_weeks()
         self.gdrive = GDrive()
+        self.forvo = Forvo("ssm", region="us-east-2")
         
     def _get_verb_posts(self):
         titles = self.wpt.get_titles("Verbs")
@@ -94,6 +127,10 @@ class AnkiDeVotD:
         for verb in self.verb_list[smallest_index:]:
             if verb in missing_verbs:
                 self.add_verb(verb)
+        
+        self.package_full()
+
+        self.collection.close()
     
     def open_collection(self):
         self.collection = anki.Collection('/'.join([self.cwd, self.colln_fname]))
@@ -132,6 +169,7 @@ class AnkiDeVotD:
             if d['name'] != "default" and "Present" not in d['name']:
                 for cid in d['cards']:
                     d['verbs'].add(self.get_card_verb(cid))
+                print(f"{ d['name'] } - { d['verbs'] }")
 
     def get_card_verb(self, cid: int) -> str:
         """
@@ -193,12 +231,37 @@ class AnkiDeVotD:
             decks[tense] = self.collection.decks.id(tense_name)
             self.week_decks[week].append(decks[tense])
             self.decks[decks[tense]] = {
-                    "name":  base_name,
+                    "name":  tense_name,
                     "cards": self.collection.decks.cids(decks[tense]),
                     "verbs": set()
                 }
         return decks
     
+    def get_media_link(self, word) -> str:
+        """
+        get_media_link(word) - gets the media link if in the media manager or initiates grab + add
+        """
+        media_link = f"<div>[sound:{ word }.mp3]</div>"
+        # Default forvo (library) filenames for words are f"{ word }.mp3
+        if self.collection.media.have(f"{ word }.mp3"):
+            return media_link
+        media_path = self.forvo.get_pronunciation(word)
+        if media_path is not None:
+            self.collection.media.add_file(media_path)
+            return media_link
+        else:
+            return ""
+
+    def get_model(self, tense):
+        """
+        get_model(tense) - Gets an Anki model based on tense
+        """
+        if tense == "Infinitive":
+            model_name = "Basic (and reversed card)"
+        else:
+            model_name = "Basic"
+        return self.collection.models.get(self.collection.models.id_for_name(model_name))
+
     def add_verb(self, verb):
         """
         add_verb(verb) - Adds the verb and its conjugations, along with any pronunciations, to the anki collection
@@ -211,16 +274,65 @@ class AnkiDeVotD:
         # X. Get the correct deck and sub-deck (Weekly & Present tense)
         #    X. Create these decks if they are not already formed
         #    X. Update the decks dictionary, regardless of decks prior states
-        # 3. Call Forvo API to grab pronunciation (if not already in media store)
-        # 4. Add pronunciation to media store
-        # 5. Create notes and add to proper decks
+        # X. Call Forvo API to grab pronunciation (if not already in media store)
+        # X. Add pronunciation to media store
+        # X. Create notes and add to proper decks
         #
+        
+        # This is how we define our note information structure:
+        #    LeoVerb - This contains two dictionaries plus the german and english verb:
+        #       - conjugations - German conjugation dictionary
+        #       - en_conjugations - English conjugation dictionary
+        #       - verb - German infinitive
+        #       - english - English infinitive
+        #    self.tenses - This contains a reference to the deck tense and a list for each reference:
+        #       - self.tenses[tense][0] - German key hierarchy in LeoVerb.conjugations
+        #       - self.tenses[tense][1] - English key hierarchy in LeoVerb.conjugations
+
         print(f"Adding { verb } to anki collection")
         decks = self.get_next_verb_deck()
+        print("** Decks:")
         print(json.dumps(decks, indent=4))
         leo = LeoVerb(verb)
-        conj = leo.conjugations
-        print(conj)
+        en_inf = '; '.join(leo.english)
+        media_link = self.get_media_link(leo.verb)
+        notes = {      # Dictionary of list of cards with Front (english) and Back (german) - Starting with infinitive
+            "Infinitive": [[en_inf, f"{ leo.verb }{ media_link }"]]
+            } 
+        for tense in filter(lambda t: t != "Infinitive", decks.keys()):
+            tense_notes = []
+            path = self.tenses[tense]
+            # sets up de_conj and en_conj to be the leo conjugations for this tense
+            de_conj = leo.conjugations
+            for p in path[0]:
+                de_conj = de_conj[p]
+            en_conj = leo.en_conjugations
+            for p in path[1]:
+                en_conj = en_conj[p]
+            # Cycle through pronouns and create notes
+            for pronoun in de_conj.keys():
+                de_pn = PRONOUN_NOTE_TABLE[pronoun]
+                en_f = FIELD_TRANSLATION_TABLE[pronoun]
+                en_pn = PRONOUN_TRANSLATION_TABLE[pronoun]
+                media_link = self.get_media_link(de_conj[pronoun])
+                note_txt = [f"{ en_pn } { en_conj[en_f] }<br>({ en_inf })", f"{ de_pn } { de_conj[pronoun] } { media_link }"]
+                tense_notes.append(note_txt)
+            notes[tense] = tense_notes
+        
+        # CREATE CARDS!!!
+        for tense in decks.keys():
+            model = self.get_model(tense)
+            for note_txt in notes[tense]:
+                note = anki.notes.Note(self.collection, model)
+                note.fields = note_txt
+                self.collection.add_note(note, decks[tense])
+            if tense == "Infinitive":
+                self.decks[decks[tense]]['verbs'].add(leo.verb)
+
+    def package_full(self):
+        output_file = '/'.join([self.cwd, self.data_dir, self.full_output_file])
+        exporter = AnkiPackageExporter(self.collection)
+        exporter.exportInto(output_file)
 
 def authorize_drive():
     gauth = GoogleAuth()
