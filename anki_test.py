@@ -1,7 +1,9 @@
 # 
-# anki_test.py - Tarah Z. Tamayo
+# anki_test.py
 #    -- Testing out retrieval and creation of collections / decks / cards using the anki library
 # 
+# Distributed under MIT license (see license.txt), Copyright Tarah Z. Tamayo
+#
 
 import os
 #from zipfile import ZipFile
@@ -53,8 +55,12 @@ new_colln = anki.Collection(new_testfile)
 print(new_colln)
 
 print("\nCREATING A DECK...")
-deck = new_colln.decks.id("Test 1::Test 2::Test 3")
+deck_id = new_colln.decks.id("Test 1::Test 2::Test 3")
 print(new_colln.decks.all_names_and_ids())
+
+print("GETTING DECK 'Test 3'")
+deck = new_colln.decks.get(deck_id)
+print(deck)
 
 print("\nGET MODELS")
 models = new_colln.models.all()
