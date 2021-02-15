@@ -1,4 +1,4 @@
-# 
+#
 # AnkiDeVotD - Goals for this class:
 #     X Get full list of verbs from wordpress -- WPT library will handle this
 #     X Figure out which week we're in (based on number of verbs posts / verb list)
@@ -106,16 +106,25 @@ class AnkiDeVotD:
         if len(week) > 0:
             self.weeks.append(week)
     
-    def run(self):
-        """
-        run() - Workflow to update all verbs not yet created in Anki collection.
-        """
+    def setup(self):
         fname = self.gdrive.dl_year((len(self.weeks) // 52) + 1)
         self.current_pkg = self.cwd + "/data/" + fname
         self.open_collection()
         self.importpkg()
         self.get_decks()
         self.get_verbs()
+    
+    def is_up_to_date(self):
+        if self.collection is None:
+            self.setup()
+        missing = self.get_missing_verbs()
+        return False if len(missing) > 0 else True
+    
+    def run(self):
+        """
+        run() - Workflow to update all verbs not yet created in Anki collection.
+        """
+        self.setup()
         
         # We care about order - the self.verb_list is in posted order and they should be added in this order
         smallest_index = len(self.verb_list)
@@ -129,7 +138,7 @@ class AnkiDeVotD:
                 self.add_verb(verb)
         
         self.package_full()
-
+        self.package_week()
         self.collection.close()
     
     def open_collection(self):
@@ -242,7 +251,7 @@ class AnkiDeVotD:
         get_media_link(word) - gets the media link if in the media manager or initiates grab + add
         """
         media_link = f"<div>[sound:{ word }.mp3]</div>"
-        # Default forvo (library) filenames for words are f"{ word }.mp3
+        # Default forvo (library) filenames for words are f"{ word }.mp3"
         if self.collection.media.have(f"{ word }.mp3"):
             return media_link
         media_path = self.forvo.get_pronunciation(word)
@@ -289,6 +298,9 @@ class AnkiDeVotD:
         #       - self.tenses[tense][0] - German key hierarchy in LeoVerb.conjugations
         #       - self.tenses[tense][1] - English key hierarchy in LeoVerb.conjugations
 
+        if self.collection is None:
+            self.setup()
+
         print(f"Adding { verb } to anki collection")
         decks = self.get_next_verb_deck()
         print("** Decks:")
@@ -311,12 +323,13 @@ class AnkiDeVotD:
                 en_conj = en_conj[p]
             # Cycle through pronouns and create notes
             for pronoun in de_conj.keys():
-                de_pn = PRONOUN_NOTE_TABLE[pronoun]
-                en_f = FIELD_TRANSLATION_TABLE[pronoun]
-                en_pn = PRONOUN_TRANSLATION_TABLE[pronoun]
-                media_link = self.get_media_link(de_conj[pronoun])
-                note_txt = [f"{ en_pn } { en_conj[en_f] }<br>({ en_inf })", f"{ de_pn } { de_conj[pronoun] } { media_link }"]
-                tense_notes.append(note_txt)
+                if pronoun in PRONOUN_NOTE_TABLE.keys():
+                    de_pn = PRONOUN_NOTE_TABLE[pronoun]
+                    en_f = FIELD_TRANSLATION_TABLE[pronoun]
+                    en_pn = PRONOUN_TRANSLATION_TABLE[pronoun]
+                    media_link = self.get_media_link(de_conj[pronoun])
+                    note_txt = [f"{ en_pn } { en_conj[en_f] }<br>({ en_inf })", f"{ de_pn } { de_conj[pronoun] } { media_link }"]
+                    tense_notes.append(note_txt)
             notes[tense] = tense_notes
         
         # CREATE CARDS!!!
@@ -330,9 +343,19 @@ class AnkiDeVotD:
                 self.decks[decks[tense]]['verbs'].add(leo.verb)
 
     def package_full(self):
+        """
+        package_full() - Packages up the latest year and initiates upload to Google Drive
+        """
         output_file = '/'.join([self.cwd, self.data_dir, self.full_output_file])
         exporter = AnkiPackageExporter(self.collection)
         exporter.exportInto(output_file)
+
+    def package_week(self):
+        """
+        package_week() - Packages up the latest week and initiates upload to Google Drive
+        -- This is a bit more complicated and requires us to export only part of the collection. I need to figure out how to do that
+        """
+        pass
 
 def authorize_drive():
     gauth = GoogleAuth()
@@ -401,6 +424,12 @@ class GDrive:
                     json.dump(f, metafile)
         os.chdir("..")
         return True
+        
+    def ul_package(self, pkg_name) -> bool:
+        """
+        ul_package(pkg_name) - Uploads package to Google Drive
+        """
+        pass
 
     # Sorry - this is not modularized yet and is specific to this project
     def dl_week(self, week) -> str:

@@ -437,7 +437,8 @@ class LeoVerb:
                     if row_parts[0] not in tense_dict.keys():
                         tense_dict[row_parts[0]] = ' '.join(row_parts[1:])
                 else:
-                    tense_dict = row_parts[0]
+                    print(row_parts)
+                #    tense_dict = row_parts[0]
         head_dict[tense] = tense_dict
         if lang == "en":
             if header not in self.en_conjugations.keys():

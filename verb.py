@@ -20,6 +20,7 @@
 import sys
 from leoverb import LeoVerb
 from wpt import WPT
+from ankidevotd import AnkiDeVotD
 
 class VerbRunner:
     """
@@ -32,6 +33,8 @@ class VerbRunner:
     current_verb = None
     # Dictionary cache of LeoVerb objects keyed on German verb
     leo_verbs = None
+    # Anki object
+    anki = None
     
     def __init__(self):
         """
@@ -39,6 +42,7 @@ class VerbRunner:
         """
         self.leo_verbs = {}
         self._set_wpt()
+        self.anki = AnkiDeVotD(self.wpt)
     
     def _set_wpt(self):
         self.wpt = WPT(secret_store="ssm", region="us-east-2")
@@ -49,6 +53,13 @@ class VerbRunner:
         """
         self.current_verb = leo_verb
         self.leo_verbs[leo_verb.verb] = leo_verb
+    
+    def anki_run(self):
+        """
+        VerbRunner.anki_run()
+          - Runs anki update to make ensure all verbs are updated in the main anki collection
+        """
+        self.anki.run()
     
     def votd(self, verb: str):
         """
@@ -80,11 +91,19 @@ class VerbRunner:
             print("Ok, exiting.")
             exit()
         
+        # Post to Wordpress
         self.wpt.post(["Verbs"], ["Indikativ", "Präsens"])
+        
+        # Update Anki
+        if not self.anki.is_up_to_date():
+            self.anki.run()
+        self.anki.add_verb(verb)
+        self.anki.package_full()
 
 # CLI arguments and number of total arguments required (must be at least 1)
 CLI = {
-    "votd": 2
+    "votd": 2,
+    "anki": 1
 }
      
 if __name__ == "__main__":
@@ -105,3 +124,5 @@ if __name__ == "__main__":
     if sys.argv[1] == "votd":
         verb = sys.argv[2]
         vr.votd(verb)
+    if sys.argv[1] == "anki":
+        vr.anki_run()
