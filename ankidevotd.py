@@ -12,6 +12,7 @@
 #
 
 import os
+import string
 import json
 from wpt import WPT
 from leoverb import LeoVerb
@@ -51,6 +52,9 @@ PRONOUN_NOTE_TABLE = {
     "ihr": "ihr", 
     "sie": "Sie / sie"}
 
+def get_two_digit_week(week: int) -> str:
+    return "0" + str(week) if week < 10 else str(week)
+
 class AnkiDeVotD:
     """
     AnkiDeVotD - Class to build Deutsch Verb of the Week decks and cards in Anki and deploy anki card
@@ -71,7 +75,7 @@ class AnkiDeVotD:
     
     cwd = None
     data_dir = "data"
-    full_output_file = "German VotD.apkg"
+    full_output_file = "German__VotD.apkg"
     wpt = None
     
     verb_list = None
@@ -163,13 +167,17 @@ class AnkiDeVotD:
             # This section is specific to how I set up my decks. Keyed by week, there should be at least
             # 2 deck IDs per week, stored in a list
             name_parts = deck.name.split("::")
-            if len(name_parts) == 1:
+            print(name_parts)
+            if len(name_parts) < 3:
                 week = 0
             else:
-                week = int(name_parts[1].split()[1])
-                if week not in self.week_decks.keys():
-                    self.week_decks[week] = []
-                self.week_decks[week].append(deck.id)
+                week_str = name_parts[2].split()[1]
+                if all([x in string.digits for x in week_str]):
+                    week = int(week_str)
+                    if week not in self.week_decks.keys():
+                        self.week_decks[week] = []
+                    self.week_decks[week].append(deck.id)
+                else: week = 0
     
     def get_verbs(self):
         # Cycle through all decks that fit the criteria
@@ -226,7 +234,7 @@ class AnkiDeVotD:
     def create_new_weekly_deck(self, week: int) -> list:
         decks = {}
         self.week_decks[week] = []
-        base_name = f"German VotD::Week { week }"
+        base_name = f"German::VotD::Week { get_two_digit_week(week) }"
         decks['Infinitive'] = self.collection.decks.id(base_name)
         self.week_decks[week].append(decks['Infinitive'])
         self.decks[decks['Infinitive']] = {
@@ -236,7 +244,7 @@ class AnkiDeVotD:
             }
         tense_names = []
         for tense in self.tenses.keys():
-            tense_name = f"German VotD::Week { week }::{ tense }"
+            tense_name = f"German::VotD::Week { get_two_digit_week(week) }::{ tense }"
             decks[tense] = self.collection.decks.id(tense_name)
             self.week_decks[week].append(decks[tense])
             self.decks[decks[tense]] = {
@@ -244,6 +252,8 @@ class AnkiDeVotD:
                     "cards": self.collection.decks.cids(decks[tense]),
                     "verbs": set()
                 }
+        for deck in decks.values():
+            print(self.collection.decks.get(deck)['name'])
         return decks
     
     def get_media_link(self, word) -> str:
@@ -269,7 +279,10 @@ class AnkiDeVotD:
             model_name = "Basic (and reversed card)"
         else:
             model_name = "Basic"
-        return self.collection.models.get(self.collection.models.id_for_name(model_name))
+        models = self.collection.models.all()
+        model = next(filter(lambda m: model_name in m['name'], models))
+        print(model)
+        return model
 
     def add_verb(self, verb):
         """
@@ -319,16 +332,27 @@ class AnkiDeVotD:
             for p in path[0]:
                 de_conj = de_conj[p]
             en_conj = leo.en_conjugations
-            for p in path[1]:
-                en_conj = en_conj[p]
+            if path[1][0] in en_conj.keys():
+                for p in path[1]:
+                    en_conj = en_conj[p]
+            else:
+                en_conj = {}
             # Cycle through pronouns and create notes
             for pronoun in de_conj.keys():
                 if pronoun in PRONOUN_NOTE_TABLE.keys():
                     de_pn = PRONOUN_NOTE_TABLE[pronoun]
                     en_f = FIELD_TRANSLATION_TABLE[pronoun]
                     en_pn = PRONOUN_TRANSLATION_TABLE[pronoun]
+                    de_tense = ' '.join(self.tenses[tense][0])
+                    en_tense = ' '.join(self.tenses[tense][1])
+                    
                     media_link = self.get_media_link(de_conj[pronoun])
-                    note_txt = [f"{ en_pn } { en_conj[en_f] }<br>({ en_inf })", f"{ de_pn } { de_conj[pronoun] } { media_link }"]
+                    if en_f in en_conj.keys():
+                        note_txt = [f"{ en_pn } { en_conj[en_f] }<br>({ en_inf })<br>(<i>{ en_tense }</i>)",
+                                    f"{ de_pn } { de_conj[pronoun] }{ media_link }(<i>{ de_tense }</i>)"]
+                    else:
+                        note_txt = [f"{ en_pn } (<i>{ en_inf }</i>)<br>({ en_inf })<br>(<i>{ en_tense }</i>)",
+                                    f"{ de_pn } { de_conj[pronoun] }{ media_link }(<i>{ de_tense }</i>)"]
                     tense_notes.append(note_txt)
             notes[tense] = tense_notes
         
@@ -433,7 +457,8 @@ class GDrive:
 
     # Sorry - this is not modularized yet and is specific to this project
     def dl_week(self, week) -> str:
-        fname = f"German VotD__Week { week }.apkg"
+        week_str = get_two_digit_week(week)
+        fname = f"German__VotD__Week { week_str }.apkg"
         if self.dl_package(fname):
             return fname
         else:
@@ -442,9 +467,9 @@ class GDrive:
     # Sorry - this is not modularized yet and is specific to this project
     def dl_year(self, year):
         if year == 1:
-            fname = f"German VotD.apkg"
+            fname = f"German__VotD.apkg"
         else:
-            fname = f"German VotD { year }.apkg"
+            fname = f"German__VotD { year }.apkg"
         if self.dl_package(fname):
             return fname
         else:

@@ -316,8 +316,18 @@ class LeoVerb:
         conj_cell = None
         while j < len(self.english):
             i = 0
+            # One problem: sometimes no English conjugation tables are available!
+            #   Handling this issue? Options:
+            #      * User (me) provides a table
+            #      * Anki notes indicate requested verb tense and don't provide table when a table is unavailable
+            #   The latter is preferred I think. This means changing the Anki layout somewhat. Required changes here:
+            #      * in get_table("en"): if no link was found, Ignore and dump an empty table / None to the DB
             # English verb w/o "to"
-            en_verb = self.english[j].split()[1].lower()
+            en = self.english[j].split()
+            if en[0] == "to":
+                en_verb = ' '.join(en[1:]).lower()
+            else:
+                en_verb = ' '.join(en).lower()
             regex = re.compile(f'<td(((?!>).)*)>(((?!</td>).)*)data-dz-flex-label-1="{ en_verb }( \(1\))?"(((?!</td>).)*)"Open verb table"(((?!</td>).)*)</td>')
             while not conj_cell and i < len(self.html_verb_rows):
                 # Looking for conjugation tables (EN)
@@ -379,6 +389,8 @@ class LeoVerb:
             tenses = TENSES
         header = {'User-Agent': "Mozilla/5.0 (iPad; CPU OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/87.0.4280.77 Mobile/15E148 Safari/604.1"}
         if lang == "en":
+            if self.en_table_link is None:
+                return
             response = requests.get(self.en_table_link, headers=header)
         else:
             response = requests.get(self.table_link, headers=header)
